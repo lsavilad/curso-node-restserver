@@ -5,14 +5,28 @@ const Usuario = require('../models/usuario');
 
 
 
-const usuariosGet = (req = request, res = response) => {
-    const { q, nombre, apellido, edad } = req.query;
+const usuariosGet = async (req = request, res = response) => {
+    //const { q, nombre, apellido, edad } = req.query;
+    const { limite = 5, desde = 0 } = req.query;
+    const queryDB = { estado: true };
+    //Se ejecutan peticiones esperando a que termine para procesar la siguiente
+    /*
+    const usuarios = await Usuario.find(queryDB)
+        .skip(desde)
+        .limit(limite);
+    const total = await Usuario.countDocuments(queryDB);
+    */
+    //Se ejecutan peticiones simultaneamente y entrega el resultado en cuanto la ultima finalice
+    const [total, usuarios] = await Promise.all([
+        Usuario.countDocuments(queryDB),
+        Usuario.find(queryDB)
+            .skip(desde)
+            .limit(limite)
+    ])
     res.json({
-        msg: 'get api usuarios',
-        q,
-        nombre,
-        apellido,
-        edad
+        total,
+        usuarios
+
     })
 }
 
@@ -30,31 +44,34 @@ const usuariosPost = async (req, res = response) => {
 
     await usuario.save();
 
-    res.json({
-        msg: 'Post api usuarios',
-        usuario
-    })
+    res.json(usuario)
 }
 
-const usuariosDelete = (req, res = response) => {
+const usuariosDelete = async (req, res = response) => {
+
+    const {id} = req.params;
+
+    //Borrar fisicamente un registro
+    //const usuario = await Usuario.findByIdAndDelete(id);
+    //Inactivar logicamente el registro sin borrarlo
+    const usuario = await Usuario.findByIdAndUpdate(id,{estado:false})
     res.json({
-        msg: 'Delete api usuarios'
+        usuario
     })
 }
 
 const usuariosPut = async (req, res = response) => {
     const { id } = req.params.id;
-    const {password, google,correo,...resto} = req.body;
+    const { _id, password, google, correo, ...resto } = req.body;
     if (password) {
         const salt = bcryptjs.genSaltSync();
         resto.password = bcryptjs.hashSync(password, salt);
     }
 
-    const usuario = await Usuario.findByIdAndUpdate(id, resto);
-    
+    const usuario = await Usuario.findOneAndUpdate(id, resto, { new: true });
+
     res.json({
-        msg: 'Put api usuarios',
-        id
+        usuario
     })
 }
 
